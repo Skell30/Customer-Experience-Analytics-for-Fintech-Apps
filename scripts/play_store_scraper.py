@@ -1,58 +1,31 @@
-from google_play_scraper import Sort, reviews
-import csv
+from google_play_scraper import reviews
+import pandas as pd
 from datetime import datetime
-import schedule
-import logging
-import time
 
-# Set up logging
-logging.basicConfig(filename='scraper.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+class BankReviewScraper:
+    def __init__(self, app_id, bank_name):
+        self.app_id = app_id
+        self.bank_name = bank_name
 
-# Add an immediate log message right after setup and force it to write
-logging.info("Script started.")
-logging.getLogger().handlers[0].flush() # Force flush the file handler
-
-def scrape_play_store_reviews():
-    APP_ID = 'com.dashen.dashensuperapp' 
-    logging.info("🔄 Fetching reviews...")
-
-    try:
-        results, _ = reviews(
-            APP_ID,
-            lang='en',
-            country='us',
-            sort=Sort.NEWEST,
-            count=5000,
-            filter_score_with=None
-        )
-
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f'Dashen_reviews_{timestamp}.csv'
-
-        # Write to CSV without using pandas
-        with open(filename, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.DictWriter(file, fieldnames=['review_text', 'rating', 'date', 'bank_name', 'source'])
-            writer.writeheader()
-
-            for entry in results:
-                writer.writerow({
-                    'review_text': entry['content'],
-                    'rating': entry['score'],
-                    'date': entry['at'].strftime('%Y-%m-%d'),
-                    'bank_name': 'Dashin bank',
-                    'source': 'Google Play'
-                })
-
-        logging.info(f"✅ Saved {len(results)} reviews to {filename}")
-    except Exception as e:
-        logging.error(f"Error occurred: {e}")
-
-# Different scheduling options (uncomment the one you want to use):
-#schedule.every().day.at("01:00").do(scrape_play_store_reviews)  # Daily at 1 AM
-# schedule.every(6).hours.do(scrape_play_store_reviews)           # Every 6 hours
-# schedule.every().monday.do(scrape_play_store_reviews)           # Every Monday
-# schedule.every().hour.do(scrape_play_store_reviews)             # Every hour
-
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+    def fetch_reviews(self, count):
+        try:
+            result, _ = reviews(
+                self.app_id,
+                lang='en',
+                country='et',
+                count=count,  # Target 400+ reviews per bank
+                filter_score_with=None
+            )
+            # Check if result is empty
+            if not result:
+                raise ValueError("No reviews returned. Check app_id or API access.")
+            # Convert to DataFrame and inspect columns
+            df = pd.DataFrame(result)
+            df = df[['content', 'score', 'at']]
+            df.rename(columns={'content': 'review', 'score': 'rating', 'at': 'date'}, inplace=True)
+            df['bank'] = self.bank_name
+            df['source'] = 'Google Play'
+            return df
+        except Exception as e:
+            print(f"Error fetching reviews: {e}")
+            return None
